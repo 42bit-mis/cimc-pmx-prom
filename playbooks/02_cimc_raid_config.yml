@@ -1,0 +1,79 @@
+---
+- name: Configure RAID virtual drives on standalone CIMC
+  hosts: cimc-001
+  gather_facts: false
+  vars_files:
+    - ../cimc_vars.yml
+
+  tasks:
+    - name: Validate RAID variable structure
+      ansible.builtin.assert:
+        that:
+          - raid_config.virtual_drives is defined
+          - raid_config.virtual_drives | length > 0
+          - raid_config.virtual_drives[0].name == 'OS_RAID1'
+        fail_msg: "raid_config.virtual_drives must exist, and the first item should be OS_RAID1 so boot-drive selection is deterministic."
+
+    - name: Optionally query existing virtual drives
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: http
+        validate_certs: false
+        content: |
+          <configResolveClass inHierarchical='false' classId='storageVirtualDrive'/>
+        timeout: 120
+      delegate_to: localhost
+      register: existing_vds
+
+    - name: Stop when virtual drives already exist and recreation is disabled
+      ansible.builtin.fail:
+        msg: >-
+          Existing virtual drives were detected. Set raid_force_recreate=true only after manually deleting old arrays
+          or adapting this playbook to your exact migration plan.
+      when:
+        - raid_force_recreate | bool == false
+        - existing_vds.configResolveClass is defined
+        - existing_vds.configResolveClass.outConfigs is defined
+        - existing_vds.configResolveClass.outConfigs.storageVirtualDrive is defined
+
+    - name: Render RAID XML payload
+      ansible.builtin.template:
+        src: ../templates/raid_config.xml.j2
+        dest: /tmp/{{ inventory_hostname }}-raid.xml
+        mode: '0600'
+      delegate_to: localhost
+
+    - name: Create requested virtual drives
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        path: /tmp/{{ inventory_hostname }}-raid.xml
+        timeout: 600
+      delegate_to: localhost
+      register: raid_apply
+
+    - name: Set the first virtual drive as boot drive
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        content: |
+          <configConfMo dn="{{ cimc_storage_controller_dn }}/vd-0"><inConfig>
+            <storageVirtualDrive dn="{{ cimc_storage_controller_dn }}/vd-0" id="0" adminAction="set-boot-drive"/>
+          </inConfig></configConfMo>
+        timeout: 120
+      delegate_to: localhost
+      register: set_boot_vd
+
+    - name: Show RAID API response summary
+      ansible.builtin.debug:
+        msg:
+          - "Create response: {{ raid_apply.response }}"
+          - "Boot VD response: {{ set_boot_vd.response }}"

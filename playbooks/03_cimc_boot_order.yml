@@ -1,0 +1,41 @@
+---
+- name: Configure boot order on standalone CIMC
+  hosts: cimc-001
+  gather_facts: false
+  vars_files:
+    - ../cimc_vars.yml
+
+  tasks:
+    - name: Validate supported boot device types
+      ansible.builtin.assert:
+        that:
+          - item.type in ['storage', 'pxe', 'cimc_mapped_dvd']
+        fail_msg: "Supported boot device types are: storage, pxe, cimc_mapped_dvd. USB was intentionally omitted from the final layout."
+      loop: "{{ boot_order.devices }}"
+      loop_control:
+        label: "{{ item.type }}"
+
+    - name: Render boot order XML payload
+      ansible.builtin.template:
+        src: ../templates/boot_order.xml.j2
+        dest: /tmp/{{ inventory_hostname }}-boot-order.xml
+        mode: '0600'
+      delegate_to: localhost
+
+    - name: Apply boot order
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: https
+        validate_certs: false
+        path: "{{ rendered_xml_file }}"
+        timeout: 120
+      delegate_to: localhost
+      register: boot_order_apply
+
+    - name: Show boot order API response summary
+      ansible.builtin.debug:
+        msg:
+          - "Response: {{ boot_order_apply.response }}"
+          - "A host reboot is required before the new boot order takes effect."

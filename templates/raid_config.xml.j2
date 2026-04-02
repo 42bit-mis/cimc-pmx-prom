@@ -1,0 +1,13 @@
+{% for vd in raid_config.virtual_drives %}
+<configConfMo dn="{{ cimc_storage_controller_dn }}/virtual-drive-create" inHierarchical="false"><inConfig>
+  <storageVirtualDriveCreatorUsingUnusedPhysicalDrive
+    dn="{{ cimc_storage_controller_dn }}/virtual-drive-create"
+    virtualDriveName="{{ vd.name }}"
+    raidLevel="{{ vd.raid_level | regex_replace('^raid', '') }}"
+    {% if vd.size_mb | default('') | string | length > 0 %}size="{{ vd.size_mb }}"{% endif %}
+    driveGroup="[{{ vd.disks | map('regex_replace', '^.*/', '') | join(',') }}]"
+    writePolicy="{{ vd.write_policy | default('WriteBackGoodBbu') }}"
+    adminState="triggered"
+  />
+</inConfig></configConfMo>
+{% endfor %}

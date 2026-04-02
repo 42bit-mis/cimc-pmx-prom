@@ -1,0 +1,112 @@
+---
+- name: Verify standalone CIMC configuration
+  hosts: cimc-001
+  gather_facts: false
+  vars_files:
+    - ../cimc_vars.yml
+
+  tasks:
+    - name: Query management interface
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: http
+        validate_certs: false
+        timeout: 60
+        content: |
+          <configResolveClass classId="mgmtIf" inHierarchical='false'/>
+      delegate_to: localhost
+      register: verify_mgmt
+
+    - name: Query firmware inventory
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        content: |
+          <configResolveClass inHierarchical='false' classId='firmwareRunning'/>
+      delegate_to: localhost
+      register: verify_firmware
+
+    - name: Query storage controller properties
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        content: |
+          <configResolveClass inHierarchical='false' classId='storageControllerProps'/>
+      delegate_to: localhost
+      register: verify_storage_controller
+
+    - name: Query virtual drives
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        content: |
+          <configResolveClass inHierarchical='false' classId='storageVirtualDrive'/>
+      delegate_to: localhost
+      register: verify_virtual_drives
+
+    - name: Query boot configuration
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        content: |
+          <configResolveClass inHierarchical='true' classId='lsbootDevPrecision'/>
+      delegate_to: localhost
+      register: verify_boot
+
+    - name: Query active faults
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: "{{ cimc_protocol | default('https') }}"
+        validate_certs: "{{ cimc_validate_certs | default(false) }}"
+        content: |
+          <configResolveClass inHierarchical='false' classId='faultInst'/>
+      delegate_to: localhost
+      register: verify_faults
+
+    - name: Optionally verify IPMI from the Ubuntu control node
+      ansible.builtin.command:
+        argv:
+          - ipmitool
+          - -I
+          - lanplus
+          - -H
+          - "{{ ipmi_config.host }}"
+          - -U
+          - "{{ ipmi_config.user }}"
+          - -P
+          - "{{ ipmi_config.password }}"
+          - chassis
+          - power
+          - status
+      delegate_to: localhost
+      register: verify_ipmi
+      changed_when: false
+      failed_when: false
+      when: ipmi_config.enabled | default(false) | bool
+
+    - name: Render verification report
+      ansible.builtin.template:
+        src: ../templates/verification_report.j2
+        dest: /tmp/{{ inventory_hostname }}-verification-report.txt
+        mode: '0600'
+      delegate_to: localhost
+
+    - name: Show report path
+      ansible.builtin.debug:
+        msg: "/tmp/{{ inventory_hostname }}-verification-report.txt"

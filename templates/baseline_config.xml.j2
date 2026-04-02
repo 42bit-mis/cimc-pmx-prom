@@ -1,0 +1,49 @@
+<!-- Hostname on the CIMC management interface -->
+<configConfMo><inConfig>
+  <mgmtIf dn="{{ cimc_mgmt_if_dn }}"
+          hostname="{{ server_config.hostname }}"
+          {% if cimc_apply_network | bool %}
+          dhcpEnable="no"
+          dnsUsingDhcp="no"
+          extIp="{{ cimc_network.ip_address }}"
+          extMask="{{ cimc_network.subnet_mask }}"
+          extGw="{{ cimc_network.default_gateway }}"
+          dnsPreferred="{{ cimc_network.dns_servers[0] | default('0.0.0.0') }}"
+          dnsAlternate="{{ cimc_network.dns_servers[1] | default('0.0.0.0') }}"
+          {% endif %}
+  />
+</inConfig></configConfMo>
+
+<!-- Friendly label / description on the rack unit -->
+<configConfMo><inConfig>
+  <computeRackUnit dn="{{ rack_unit_dn }}" usrLbl="{{ server_config.description }}" />
+</inConfig></configConfMo>
+
+<!-- Timezone -->
+<configConfMo><inConfig>
+  <topSystem dn="sys" timeZone="{{ server_config.timezone }}" />
+</inConfig></configConfMo>
+
+{% if ntp_servers | default([]) | length > 0 %}
+<!-- NTP -->
+<configConfMo><inConfig>
+  <commNtpProvider dn="{{ cimc_ntp_service_dn }}"
+    {% if ntp_servers | length > 0 %}ntpServer1="{{ ntp_servers[0] }}"{% endif %}
+    {% if ntp_servers | length > 1 %} ntpServer2="{{ ntp_servers[1] }}"{% endif %}
+    {% if ntp_servers | length > 2 %} ntpServer3="{{ ntp_servers[2] }}"{% endif %}
+    {% if ntp_servers | length > 3 %} ntpServer4="{{ ntp_servers[3] }}"{% endif %}
+  />
+</inConfig></configConfMo>
+{% endif %}
+
+{% if services.disable_http | default(true) %}
+<!-- Disable plain HTTP -->
+<configConfMo><inConfig>
+  <commHttp dn="{{ cimc_http_service_dn }}" adminState="disabled" />
+</inConfig></configConfMo>
+{% endif %}
+
+<!-- Keep HTTPS enabled -->
+<configConfMo><inConfig>
+  <commHttps dn="{{ cimc_https_service_dn }}" adminState="enabled" sessionTimeout="{{ services.https_session_timeout | default(1800) }}" />
+</inConfig></configConfMo>

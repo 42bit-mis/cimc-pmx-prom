@@ -1,0 +1,13 @@
+<configConfMo><inConfig>
+  <lsbootDevPrecision dn="{{ rack_unit_dn }}/boot-precision" rebootOnUpdate="yes" reapply="yes">
+{% for dev in boot_order.devices | sort(attribute='order') %}
+{% if dev.type == 'storage' %}
+    <lsbootStorage dn="{{ rack_unit_dn }}/boot-policy/storage-read-write" access="read-write" order="{{ dev.order }}" type="storage" state="{{ 'Enabled' if dev.enabled | default(true) else 'Disabled' }}" />
+{% elif dev.type == 'pxe' %}
+    <lsbootLan dn="{{ rack_unit_dn }}/boot-policy/lan-read-only" access="read-only" order="{{ dev.order }}" prot="pxe" type="lan" state="{{ 'Enabled' if dev.enabled | default(true) else 'Disabled' }}" />
+{% elif dev.type == 'cimc_mapped_dvd' %}
+    <lsbootVMedia dn="{{ rack_unit_dn }}/boot-precision/vm-CIMC-map" name="CIMC-map" type="VMEDIA" subtype="cimc-mapped-dvd" access="read-only-remote" order="{{ dev.order }}" state="{{ 'Enabled' if dev.enabled | default(true) else 'Disabled' }}" />
+{% endif %}
+{% endfor %}
+  </lsbootDevPrecision>
+</inConfig></configConfMo>

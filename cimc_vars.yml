@@ -1,0 +1,108 @@
+---
+# Safe defaults for a standalone Cisco C220 M4 on CIMC 4.1.
+# These values are read by the playbooks in ./playbooks.
+
+server_config:
+  hostname: 42bit-dc1-pve-cluster-001
+  description: 42bit-dc1-pve-cluster-001
+  timezone: Europe/Vienna
+  power_restore_policy: restore-last-state
+
+# Keep this false unless you intentionally want automation to change
+# the CIMC management IP settings. If you change the CIMC IP, your current
+# session can drop immediately.
+cimc_apply_network: false
+cimc_network:
+  ip_address: 10.42.72.244
+  subnet_mask: 255.255.255.0
+  default_gateway: 10.42.72.251
+  dns_servers:
+    - 10.42.72.251
+    - 8.8.4.4
+
+# Optional. Leave empty to skip NTP configuration.
+ntp_servers:
+  - 10.42.72.251
+
+# Optional service hardening.
+services:
+  disable_http: true
+  https_session_timeout: 1800
+
+# RAID layout for the Cisco 12G SAS Modular RAID controller.
+# The XML API create call expects physical drive IDs. For convenience,
+# the playbooks convert strings like "0/7" to "7".
+raid_force_recreate: false
+raid_config:
+  virtual_drives:
+    - name: OS_RAID1
+      raid_level: raid1
+      disks:
+        - "0/7"
+        - "0/8"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+    - name: DISK_RAID1
+      raid_level: raid0
+      disks:
+        - "0/1"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+    - name: DISK_RAID2
+      raid_level: raid0
+      disks:
+        - "0/2"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+    - name: DISK_RAID3
+      raid_level: raid0
+      disks:
+        - "0/3"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+    - name: DISK_RAID4
+      raid_level: raid0
+      disks:
+        - "0/4"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+    - name: DISK_RAID5
+      raid_level: raid0
+      disks:
+        - "0/5"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+    - name: DISK_RAID6
+      raid_level: raid0
+      disks:
+        - "0/6"
+      size_mb: "0"
+      write_policy: WriteBackGoodBbu
+
+# Legacy boot order is used here because it is simpler and more predictable
+# on this generation than trying to fully model every precision boot device.
+# USB is intentionally omitted from the final automation layout.
+boot_order:
+  mode: legacy
+  devices:
+    - type: storage
+      order: 1
+      enabled: true
+    - type: pxe
+      order: 2
+      enabled: true
+    - type: cimc_mapped_dvd
+      order: 3
+      enabled: false
+
+# Optional IPMI verification from the Ubuntu control host.
+ipmi_config:
+  enabled: false
+  host: 10.42.72.244
+  user: admin
+  password: maeloaFoo5chohsai6wo
+
+expected_firmware:
+  bios: C220M4.4.1.2f.0.1024230116
+  cimc: 4.1(2m)
+  vic: 4.4(1g)

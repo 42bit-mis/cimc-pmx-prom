@@ -1,0 +1,27 @@
+CIMC verification report
+Generated: {{ lookup('pipe', 'date --iso-8601=seconds') }}
+Host: {{ inventory_hostname }} ({{ ansible_host }})
+
+Expected firmware:
+{{ expected_firmware | to_nice_yaml(indent=2) }}
+
+Mgmt interface query:
+{{ verify_mgmt | to_nice_json }}
+
+Firmware query:
+{{ verify_firmware | to_nice_json }}
+
+Storage controller properties:
+{{ verify_storage_controller | to_nice_json }}
+
+Virtual drives:
+{{ verify_virtual_drives | to_nice_json }}
+
+Boot precision / policy:
+{{ verify_boot | to_nice_json }}
+
+Faults:
+{{ verify_faults | to_nice_json }}
+
+IPMI check:
+{{ verify_ipmi | default({'skipped': true}) | to_nice_json }}

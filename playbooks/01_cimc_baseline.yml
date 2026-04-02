@@ -1,0 +1,41 @@
+---
+- name: Configure standalone CIMC baseline
+  hosts: cimc-001
+  gather_facts: false
+  vars_files:
+    - ../cimc_vars.yml
+
+  tasks:
+    - name: Validate required baseline variables
+      ansible.builtin.assert:
+        that:
+          - cimc_username | length > 0
+          - cimc_password | length > 0
+          - server_config.hostname | length > 0
+          - server_config.description | length > 0
+          - server_config.timezone | length > 0
+
+    - name: Render baseline XML payload
+      ansible.builtin.template:
+        src: ../templates/baseline_config.xml.j2
+        dest: /tmp/{{ inventory_hostname }}-baseline.xml
+        mode: '0600'
+      delegate_to: localhost
+
+    - name: Apply IMC Config
+      community.general.imc_rest:
+        hostname: "{{ cimc_hostname }}"
+        username: "{{ cimc_username }}"
+        password: "{{ cimc_password }}"
+        protocol: http
+        validate_certs: false
+        path: "{{ rendered_xml_file }}"
+        timeout: 120
+      delegate_to: localhost
+      register: baseline_apply
+
+    - name: Show baseline API response summary
+      ansible.builtin.debug:
+        msg:
+          - "HTTP status: {{ baseline_apply.status }}"
+          - "Response: {{ baseline_apply.response }}"
